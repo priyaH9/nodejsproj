@@ -40,7 +40,7 @@ module.exports.sendMail = async (event, context, callback) => {
   }
 
   const response = await AwsInstance.sendEmail(params).promise()
-
+  console.log(response)
   callback(response)
 }
 
