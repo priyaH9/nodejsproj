@@ -1,0 +1,70 @@
+pipeline {
+    agent any
+    
+     environment {
+        NODE_ENV = 'dev'
+        LAMBDA_FUNCTION_NAME = 'testNodejsfunction'
+        ZIP_FILE_NAME = 'build.zip'
+    }
+    
+    stages {
+        stage('Code') {
+            steps {
+                echo "Cloning the code"
+                // Clone the GitHub repository
+                git url: 'https://github.com/priyaH9/nodejsproj.git', branch: 'main'
+            }
+        }
+
+
+ stage('Install Dependencies') {
+            steps {
+                script {
+                    bat 'npm install'
+                }
+            }
+        }
+
+        stage('Zip Build') {
+            steps {
+                script {
+                    // Zip the build folder (assuming the build output is in the 'build' folder)
+                    bat '"C:\\Program Files\\7-Zip\\7z.exe" a  build.zip *.*'
+                    //bat 'powershell Compress-Archive -Path build\\* -DestinationPath build.zip'
+                }
+            }
+        }
+        
+        stage('Upload to S3') {
+            steps {
+                echo 'Uploading the packaged application to S3...'
+                withAWS(region: "us-east-1", credentials: 'aws-credential-id') {
+                     s3Upload(pathStyleAccessEnabled: true, payloadSigningEnabled: true, file:'build.zip', bucket:'jenkinsbucket157')
+                }
+            }
+        }
+        stage('Deploy to Lambda') {
+            steps {
+                echo 'Deploying to AWS Lambda...'
+                withAWS(region: "us-east-1", credentials: 'aws-credential-id') {
+                    // Update the Lambda function code
+                    bat """
+                    aws lambda update-function-code \
+                        --function-name testNodejsfunction \
+                        --s3-bucket jenkinsbucket157 \
+                        --s3-key build.zip                    """
+                }
+            }
+        }
+       
+ }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
